@@ -1,0 +1,679 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Мой плеер</title>
+<style>
+  :root{
+    --bg:#0f1115;
+    --panel:#171a21;
+    --panel-2:#1e222b;
+    --line:#262b36;
+    --text:#e8eaf0;
+    --muted:#8b93a7;
+    --accent:#4f8cff;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  html,body{height:100%}
+  body{
+    background:var(--bg);color:var(--text);
+    font:15px/1.4 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+    display:flex;flex-direction:column;overflow:hidden;
+  }
+
+  /* ---------- шапка ---------- */
+  header{
+    display:flex;align-items:center;gap:12px;flex-wrap:wrap;
+    padding:14px 18px;background:var(--panel);border-bottom:1px solid var(--line);
+  }
+  .brand{font-weight:700;font-size:17px;margin-right:auto}
+  button{
+    font:inherit;color:var(--text);background:var(--panel-2);
+    border:1px solid var(--line);border-radius:10px;
+    padding:8px 14px;cursor:pointer;transition:.15s;
+  }
+  button:hover{background:#262c38;border-color:#333a49}
+  button:active{transform:scale(.97)}
+  .primary{background:var(--accent);border-color:var(--accent);color:#fff;font-weight:600}
+  .primary:hover{background:#3d7bf0;border-color:#3d7bf0}
+
+  /* ---------- список ---------- */
+  main{flex:1;display:flex;flex-direction:column;min-height:0;padding:14px 18px 0}
+  .toolbar{display:flex;align-items:center;gap:12px;margin-bottom:10px}
+  .toolbar input[type=search]{
+    flex:1;font:inherit;color:var(--text);background:var(--panel-2);
+    border:1px solid var(--line);border-radius:10px;padding:9px 14px;outline:none;
+  }
+  .toolbar input[type=search]:focus{border-color:var(--accent)}
+  .muted{color:var(--muted);font-size:13px;white-space:nowrap}
+
+  ul#playlist{list-style:none;overflow-y:auto;padding-bottom:14px;flex:1}
+  ul#playlist::-webkit-scrollbar{width:8px}
+  ul#playlist::-webkit-scrollbar-thumb{background:#2c323f;border-radius:4px}
+
+  li.track{
+    display:flex;align-items:center;gap:12px;
+    padding:8px 12px;border-radius:10px;cursor:pointer;transition:.12s;
+  }
+  li.track:hover{background:var(--panel-2)}
+  li.track.active{background:#1c2942}
+  li.track.active .tt{color:var(--accent)}
+  .num{width:24px;text-align:right;color:var(--muted);font-size:12px;flex:none}
+  li.track.active .num{color:var(--accent)}
+  .info{min-width:0;flex:1}
+  .tt{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-weight:500}
+  .ta{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-size:12.5px;color:var(--muted)}
+  .dur{font-size:12.5px;color:var(--muted);flex:none;font-variant-numeric:tabular-nums}
+  .del{
+    opacity:0;flex:none;background:none;border:none;color:var(--muted);
+    padding:4px 6px;border-radius:6px;font-size:15px;line-height:1;
+  }
+  li.track:hover .del{opacity:1}
+  .del:hover{color:#ff6b6b;background:#2a1e22}
+
+  .empty{
+    flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;
+    gap:10px;color:var(--muted);text-align:center;padding:40px 20px;
+  }
+  .empty .big{font-size:44px;opacity:.5}
+  .drop-hint{
+    position:fixed;inset:0;background:rgba(15,17,21,.9);z-index:50;
+    display:none;align-items:center;justify-content:center;
+    font-size:22px;font-weight:600;border:3px dashed var(--accent);border-radius:12px;
+  }
+  .drop-hint.on{display:flex}
+
+  /* ---------- плеер ---------- */
+  footer{
+    display:grid;grid-template-columns:1fr minmax(280px,2fr) 1fr;
+    align-items:center;gap:18px;
+    padding:12px 18px;background:var(--panel);border-top:1px solid var(--line);
+  }
+  .now{display:flex;align-items:center;gap:11px;min-width:0}
+  .cover{
+    width:44px;height:44px;flex:none;border-radius:9px;font-size:20px;
+    background:linear-gradient(135deg,#2b3purple,#222);
+    background:linear-gradient(135deg,#2b3a5c,#1a1f2b);
+    display:grid;place-items:center;color:var(--accent);
+  }
+  .now .meta{min-width:0}
+  #npTitle{font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  #npArtist{font-size:12.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+
+  .center{display:flex;flex-direction:column;gap:8px;align-items:center}
+  .controls{display:flex;align-items:center;gap:8px}
+  .controls button{
+    background:none;border:none;padding:6px;border-radius:50%;
+    font-size:17px;line-height:1;color:var(--muted);
+  }
+  .controls button:hover{color:var(--text);background:var(--panel-2)}
+  .controls button.on{color:var(--accent)}
+  #playBtn{
+    width:42px;height:42px;font-size:17px;background:#fff;color:#111;
+    display:grid;place-items:center;padding:0;
+  }
+  #playBtn:hover{background:#dfe4ee}
+
+  .progress{display:flex;align-items:center;gap:10px;width:100%}
+  .progress span{font-size:11.5px;color:var(--muted);font-variant-numeric:tabular-nums;width:36px}
+  .progress span:last-child{text-align:right}
+
+  .right{display:flex;align-items:center;gap:8px;justify-content:flex-end;color:var(--muted)}
+  .right input{width:90px}
+
+  input[type=range]{
+    -webkit-appearance:none;appearance:none;height:5px;border-radius:3px;outline:none;
+    cursor:pointer;flex:1;min-width:0;
+    background:linear-gradient(to right,var(--accent) var(--p,0%),#2a2f3a var(--p,0%));
+  }
+  input[type=range]::-webkit-slider-thumb{
+    -webkit-appearance:none;width:13px;height:13px;border-radius:50%;background:#fff;
+    border:none;cursor:pointer;box-shadow:0 0 0 3px rgba(79,140,255,.2);
+  }
+  input[type=range]::-moz-range-thumb{
+    width:13px;height:13px;border-radius:50%;background:#fff;border:none;cursor:pointer;
+  }
+
+  @media (max-width:760px){
+    footer{grid-template-columns:1fr;gap:10px;padding:10px 14px}
+    .now{order:1}
+    .center{order:2;width:100%}
+    .right{display:none}
+    main{padding:10px 12px 0}
+    header{padding:12px}
+    .brand{width:100%;margin-bottom:4px}
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="brand">🎵 Мой плеер</div>
+  <button class="primary" id="addFilesBtn">+ Добавить файлы</button>
+  <button id="addFolderBtn">📁 Папка</button>
+  <button id="clearBtn">Очистить</button>
+</header>
+
+<main>
+  <div class="toolbar">
+    <input type="search" id="search" placeholder="Поиск по названию или исполнителю…">
+    <span class="muted" id="counter">0 треков</span>
+  </div>
+  <ul id="playlist"></ul>
+  <div class="empty" id="empty">
+    <div class="big">🎧</div>
+    <div><b>Пока пусто</b></div>
+    <div class="muted">Нажмите «Добавить файлы» или перетащите музыку прямо в окно</div>
+  </div>
+</main>
+
+<footer>
+  <div class="now">
+    <div class="cover">♪</div>
+    <div class="meta">
+      <div id="npTitle">Ничего не играет</div>
+      <div id="npArtist" class="muted">—</div>
+    </div>
+  </div>
+
+  <div class="center">
+    <div class="controls">
+      <button id="shuffleBtn" title="Перемешать">🔀</button>
+      <button id="prevBtn" title="Предыдущий">⏮</button>
+      <button id="playBtn" title="Играть/Пауза">▶</button>
+      <button id="nextBtn" title="Следующий">⏭</button>
+      <button id="repeatBtn" title="Повтор">🔁</button>
+    </div>
+    <div class="progress">
+      <span id="curTime">0:00</span>
+      <input type="range" id="seek" min="0" max="1000" value="0" step="1">
+      <span id="durTime">0:00</span>
+    </div>
+  </div>
+
+  <div class="right">
+    <span>🔊</span>
+    <input type="range" id="volume" min="0" max="1" step="0.01" value="1">
+  </div>
+</footer>
+
+<input type="file" id="fileInput" accept="audio/*,.mp3,.m4a,.aac,.ogg,.opus,.wav,.flac,.webm" multiple hidden>
+<div class="drop-hint" id="dropHint">Отпустите файлы здесь</div>
+
+<script>
+/* ============ ЭЛЕМЕНТЫ ============ */
+const $ = s => document.querySelector(s);
+const audio      = new Audio();
+audio.preload = 'metadata';
+
+const playlistEl = $('#playlist');
+const emptyEl    = $('#empty');
+const searchEl   = $('#search');
+const counterEl  = $('#counter');
+const fileInput  = $('#fileInput');
+const dropHint   = $('#dropHint');
+const seekEl     = $('#seek');
+const volumeEl   = $('#volume');
+const playBtn    = $('#playBtn');
+const npTitle    = $('#npTitle');
+const npArtist   = $('#npArtist');
+const curTimeEl  = $('#curTime');
+const durTimeEl  = $('#durTime');
+
+/* ============ СОСТОЯНИЕ ============ */
+const state = {
+  tracks: [],       // {id, file, url, title, artist, duration}
+  currentId: null,
+  shuffle: false,
+  repeat: 'off',    // off | all | one
+  order: [],        // порядок id с учётом shuffle
+  pos: -1
+};
+let nextId = 1;
+let seeking = false;
+let probing = false;
+
+/* ============ УТИЛИТЫ ============ */
+const fmt = s => {
+  if (!s || !isFinite(s) || s < 0) return '0:00';
+  s = Math.floor(s);
+  const m = Math.floor(s / 60);
+  return m + ':' + String(s % 60).padStart(2, '0');
+};
+
+function setRangeFill(el, val, max){
+  const p = max > 0 ? (val / max) * 100 : 0;
+  el.style.setProperty('--p', p + '%');
+}
+
+function parseName(name){
+  const base = name.replace(/\.[^.]+$/, '').replace(/_/g, ' ').trim();
+  // "Исполнитель - Название"  /  "01. Исполнитель - Название"
+  const cleaned = base.replace(/^\d{1,3}[\s.\-–]+/, '');
+  const m = cleaned.split(/\s+[-–—]\s+/);
+  if (m.length >= 2) {
+    return { artist: m[0].trim(), title: m.slice(1).join(' - ').trim() };
+  }
+  return { artist: 'Неизвестный исполнитель', title: cleaned || name };
+}
+
+/* ============ ДОБАВЛЕНИЕ ТРЕКОВ ============ */
+const AUDIO_EXT = /\.(mp3|m4a|aac|ogg|oga|opus|wav|flac|webm|mp4)$/i;
+
+function isAudio(file){
+  return file.type.startsWith('audio/') || AUDIO_EXT.test(file.name);
+}
+
+function addFiles(fileList){
+  const files = Array.from(fileList).filter(isAudio);
+  if (!files.length) return;
+
+  const existing = new Set(state.tracks.map(t => t.file.name + '|' + t.file.size));
+
+  for (const file of files){
+    const key = file.name + '|' + file.size;
+    if (existing.has(key)) continue;      // не дублируем
+    existing.add(key);
+
+    const { artist, title } = parseName(file.name);
+    state.tracks.push({
+      id: nextId++,
+      file,
+      url: URL.createObjectURL(file),
+      title,
+      artist,
+      duration: null
+    });
+  }
+
+  rebuildOrder();
+  renderPlaylist();
+  probeDurations();
+}
+
+/* ============ ПОРЯДОК ВОСПРОИЗВЕДЕНИЯ ============ */
+function rebuildOrder(){
+  state.order = state.tracks.map(t => t.id);
+  if (state.shuffle){
+    for (let i = state.order.length - 1; i > 0; i--){
+      const j = Math.floor(Math.random() * (i + 1));
+      [state.order[i], state.order[j]] = [state.order[j], state.order[i]];
+    }
+  }
+  state.pos = state.currentId ? state.order.indexOf(state.currentId) : -1;
+}
+
+/* ============ ОТРИСОВКА ============ */
+function renderPlaylist(){
+  const q = searchEl.value.trim().toLowerCase();
+  const visible = state.tracks.filter(t =>
+    !q || (t.title + ' ' + t.artist).toLowerCase().includes(q)
+  );
+
+  playlistEl.innerHTML = '';
+  emptyEl.style.display = state.tracks.length ? 'none' : 'flex';
+  playlistEl.style.display = state.tracks.length ? 'block' : 'none';
+
+  const frag = document.createDocumentFragment();
+  visible.forEach((t, i) => {
+    const li = document.createElement('li');
+    li.className = 'track' + (t.id === state.currentId ? ' active' : '');
+    li.dataset.id = t.id;
+    li.innerHTML = `
+      <span class="num">${i + 1}</span>
+      <div class="info">
+        <div class="tt"></div>
+        <div class="ta"></div>
+      </div>
+      <span class="dur">${t.duration ? fmt(t.duration) : ''}</span>
+      <button class="del" title="Удалить">✕</button>`;
+    li.querySelector('.tt').textContent = t.title;
+    li.querySelector('.ta').textContent = t.artist;
+    frag.appendChild(li);
+  });
+  playlistEl.appendChild(frag);
+
+  counterEl.textContent = state.tracks.length
+    ? `${visible.length} из ${state.tracks.length}`
+    : '0 треков';
+}
+
+function highlightCurrent(){
+  playlistEl.querySelectorAll('li.track').forEach(li => {
+    li.classList.toggle('active', Number(li.dataset.id) === state.currentId);
+  });
+}
+
+function renderNowPlaying(){
+  const t = state.tracks.find(x => x.id === state.currentId);
+  if (!t){
+    npTitle.textContent = 'Ничего не играет';
+    npArtist.textContent = '—';
+    durTimeEl.textContent = '0:00';
+    return;
+  }
+  npTitle.textContent  = t.title;
+  npArtist.textContent = t.artist;
+  document.title = `${t.title} — ${t.artist}`;
+
+  if ('mediaSession' in navigator){
+    navigator.mediaSession.metadata = new MediaMetadata({
+      title: t.title, artist: t.artist, album: 'Мой плеер', artwork: []
+    });
+  }
+}
+
+/* ============ ВОСПРОИЗВЕДЕНИЕ ============ */
+function playId(id, autoplay = true){
+  const t = state.tracks.find(x => x.id === id);
+  if (!t) return;
+
+  state.currentId = id;
+  state.pos = state.order.indexOf(id);
+  audio.src = t.url;
+  if (autoplay) audio.play().catch(() => {});
+
+  renderNowPlaying();
+  highlightCurrent();
+  updatePlayIcon();
+}
+
+function togglePlay(){
+  if (!state.tracks.length) return;
+  if (!state.currentId){ playId(state.order[0]); return; }
+  audio.paused ? audio.play().catch(() => {}) : audio.pause();
+}
+
+function next(auto = false){
+  if (!state.order.length) return;
+
+  if (auto && state.repeat === 'one'){
+    audio.currentTime = 0;
+    audio.play().catch(() => {});
+    return;
+  }
+
+  let p = state.pos + 1;
+  if (p >= state.order.length){
+    if (auto && state.repeat !== 'all'){
+      audio.pause();
+      audio.currentTime = 0;
+      updatePlayIcon();
+      return;
+    }
+    p = 0;
+  }
+  playId(state.order[p]);
+}
+
+function prev(){
+  if (!state.order.length) return;
+  if (audio.currentTime > 3){ audio.currentTime = 0; return; }
+  let p = state.pos - 1;
+  if (p < 0) p = state.order.length - 1;
+  playId(state.order[p]);
+}
+
+function updatePlayIcon(){
+  playBtn.textContent = (!audio.paused && state.currentId) ? '⏸' : '▶';
+}
+
+/* ============ ФОНОВОЕ ЧТЕНИЕ ДЛИТЕЛЬНОСТИ ============ */
+function getDuration(url){
+  return new Promise(resolve => {
+    const a = document.createElement('audio');
+    a.preload = 'metadata';
+    const done = d => { a.onloadedmetadata = a.onerror = null; a.src = ''; resolve(d); };
+    a.onloadedmetadata = () => done(isFinite(a.duration) ? a.duration : 0);
+    a.onerror = () => done(0);
+    a.src = url;
+  });
+}
+
+async function probeDurations(){
+  if (probing) return;
+  probing = true;
+  const queue = state.tracks.filter(t => t.duration == null);
+
+  const worker = async () => {
+    while (queue.length){
+      const t = queue.shift();
+      if (!t) break;
+      t.duration = await getDuration(t.url);
+      const el = playlistEl.querySelector(`li[data-id="${t.id}"] .dur`);
+      if (el) el.textContent = fmt(t.duration);
+    }
+  };
+
+  await Promise.all([worker(), worker(), worker()]);
+  probing = false;
+}
+
+/* ============ СОБЫТИЯ АУДИО ============ */
+audio.addEventListener('play',  updatePlayIcon);
+audio.addEventListener('pause', updatePlayIcon);
+
+audio.addEventListener('loadedmetadata', () => {
+  const t = state.tracks.find(x => x.id === state.currentId);
+  if (t && isFinite(audio.duration)) t.duration = audio.duration;
+  durTimeEl.textContent = fmt(audio.duration);
+  const el = playlistEl.querySelector(`li[data-id="${state.currentId}"] .dur`);
+  if (el) el.textContent = fmt(audio.duration);
+});
+
+audio.addEventListener('timeupdate', () => {
+  if (seeking) return;
+  const d = audio.duration || 0;
+  curTimeEl.textContent = fmt(audio.currentTime);
+  seekEl.value = d ? (audio.currentTime / d) * 1000 : 0;
+  setRangeFill(seekEl, seekEl.value, 1000);
+});
+
+audio.addEventListener('ended', () => next(true));
+
+audio.addEventListener('error', () => {
+  if (state.currentId) setTimeout(() => next(true), 400);
+});
+
+/* ============ UI-ОБРАБОТЧИКИ ============ */
+playlistEl.addEventListener('click', e => {
+  const li = e.target.closest('li.track');
+  if (!li) return;
+  const id = Number(li.dataset.id);
+
+  if (e.target.classList.contains('del')){
+    const i = state.tracks.findIndex(t => t.id === id);
+    if (i === -1) return;
+    const [removed] = state.tracks.splice(i, 1);
+    URL.revokeObjectURL(removed.url);
+
+    if (removed.id === state.currentId){
+      audio.pause();
+      audio.removeAttribute('src');
+      audio.load();
+      state.currentId = null;
+      renderNowPlaying();
+    }
+    rebuildOrder();
+    renderPlaylist();
+    return;
+  }
+
+  if (id === state.currentId) togglePlay();
+  else playId(id);
+});
+
+playBtn.onclick  = togglePlay;
+nextBtn.onclick  = () => next(false);
+prevBtn.onclick  = prev;
+
+$('#shuffleBtn').onclick = e => {
+  state.shuffle = !state.shuffle;
+  e.currentTarget.classList.toggle('on', state.shuffle);
+  rebuildOrder();
+};
+
+$('#repeatBtn').onclick = e => {
+  const modes = ['off', 'all', 'one'];
+  state.repeat = modes[(modes.indexOf(state.repeat) + 1) % 3];
+  const btn = e.currentTarget;
+  btn.classList.toggle('on', state.repeat !== 'off');
+  btn.textContent = state.repeat === 'one' ? '🔂' : '🔁';
+  btn.title = { off: 'Повтор выключен', all: 'Повтор списка', one: 'Повтор трека' }[state.repeat];
+};
+
+/* перемотка */
+seekEl.addEventListener('input', () => {
+  seeking = true;
+  const d = audio.duration || 0;
+  curTimeEl.textContent = fmt((seekEl.value / 1000) * d);
+  setRangeFill(seekEl, seekEl.value, 1000);
+});
+seekEl.addEventListener('change', () => {
+  const d = audio.duration || 0;
+  if (d) audio.currentTime = (seekEl.value / 1000) * d;
+  seeking = false;
+});
+
+/* громкость */
+volumeEl.addEventListener('input', () => {
+  audio.volume = Number(volumeEl.value);
+  setRangeFill(volumeEl, volumeEl.value, 1);
+});
+
+/* поиск */
+searchEl.addEventListener('input', renderPlaylist);
+
+/* добавление файлов */
+$('#addFilesBtn').onclick = () => fileInput.click();
+fileInput.onchange = () => {
+  addFiles(fileInput.files);
+  fileInput.value = '';   // чтобы можно было выбрать те же файлы снова
+};
+
+$('#clearBtn').onclick = () => {
+  if (!state.tracks.length) return;
+  audio.pause();
+  audio.removeAttribute('src');
+  audio.load();
+  state.tracks.forEach(t => URL.revokeObjectURL(t.url));
+  state.tracks = [];
+  state.currentId = null;
+  state.order = [];
+  state.pos = -1;
+  renderPlaylist();
+  renderNowPlaying();
+  updatePlayIcon();
+};
+
+/* выбор папки (File System Access API) */
+$('#addFolderBtn').onclick = async () => {
+  if (!window.showDirectoryPicker){
+    alert('Браузер не поддерживает выбор папки.\nИспользуйте «Добавить файлы» или перетащите папку в окно.');
+    return;
+  }
+  try {
+    const dir = await window.showDirectoryPicker();
+    const files = [];
+    await collectFiles(dir, files);
+    addFiles(files);
+  } catch (err){
+    if (err.name !== 'AbortError') console.error(err);
+  }
+};
+
+async function collectFiles(dirHandle, out, depth = 0){
+  if (depth > 6) return;
+  for await (const entry of dirHandle.values()){
+    if (entry.kind === 'file'){
+      const f = await entry.getFile();
+      if (isAudio(f)) out.push(f);
+    } else if (entry.kind === 'directory'){
+      await collectFiles(entry, out, depth + 1);
+    }
+  }
+}
+
+/* drag & drop */
+let dragDepth = 0;
+window.addEventListener('dragenter', e => {
+  e.preventDefault();
+  dragDepth++;
+  dropHint.classList.add('on');
+});
+window.addEventListener('dragover', e => e.preventDefault());
+window.addEventListener('dragleave', e => {
+  e.preventDefault();
+  if (--dragDepth <= 0){ dragDepth = 0; dropHint.classList.remove('on'); }
+});
+window.addEventListener('drop', async e => {
+  e.preventDefault();
+  dragDepth = 0;
+  dropHint.classList.remove('on');
+
+  const items = e.dataTransfer.items;
+  const files = [];
+
+  if (items && items.length && items[0].webkitGetAsEntry){
+    const entries = [];
+    for (const it of items){
+      const en = it.webkitGetAsEntry();
+      if (en) entries.push(en);
+    }
+    for (const en of entries) await walkEntry(en, files);
+  } else {
+    files.push(...e.dataTransfer.files);
+  }
+  addFiles(files);
+});
+
+function walkEntry(entry, out, depth = 0){
+  return new Promise(resolve => {
+    if (depth > 6) return resolve();
+    if (entry.isFile){
+      entry.file(f => { if (isAudio(f)) out.push(f); resolve(); }, resolve);
+    } else if (entry.isDirectory){
+      const reader = entry.createReader();
+      const all = [];
+      const readBatch = () => reader.readEntries(async batch => {
+        if (!batch.length){
+          for (const en of all) await walkEntry(en, out, depth + 1);
+          return resolve();
+        }
+        all.push(...batch);
+        readBatch();
+      }, resolve);
+      readBatch();
+    } else resolve();
+  });
+}
+
+/* горячие клавиши */
+document.addEventListener('keydown', e => {
+  if (e.target.tagName === 'INPUT') return;
+  switch (e.code){
+    case 'Space':       e.preventDefault(); togglePlay(); break;
+    case 'ArrowRight':  if (e.shiftKey) next(false); else audio.currentTime += 5; break;
+    case 'ArrowLeft':   if (e.shiftKey) prev(); else audio.currentTime -= 5; break;
+    case 'ArrowUp':     e.preventDefault(); volumeEl.value = Math.min(1, +volumeEl.value + .05); volumeEl.dispatchEvent(new Event('input')); break;
+    case 'ArrowDown':   e.preventDefault(); volumeEl.value = Math.max(0, +volumeEl.value - .05); volumeEl.dispatchEvent(new Event('input')); break;
+  }
+});
+
+/* Media Session (кнопки на наушниках / экране блокировки) */
+if ('mediaSession' in navigator){
+  navigator.mediaSession.setActionHandler('play',  () => audio.play());
+  navigator.mediaSession.setActionHandler('pause', () => audio.pause());
+  navigator.mediaSession.setActionHandler('nexttrack',     () => next(false));
+  navigator.mediaSession.setActionHandler('previoustrack', prev);
+}
+
+/* ============ СТАРТ ============ */
+audio.volume = 1;
+setRangeFill(volumeEl, 1, 1);
+setRangeFill(seekEl, 0, 1000);
+renderPlaylist();
+</script>
+</body>
+</html>
